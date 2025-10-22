@@ -1,5 +1,5 @@
 Flask==3.0.3
 pandas==2.2.2
 openpyxl==3.1.2
-zk==0.9.1
+pyzk==0.9
 
