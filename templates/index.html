@@ -1,0 +1,487 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | MayChamCong{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<main class="container py-4">
+  <div id="statusMessage" class="alert d-none" role="alert"></div>
+
+  <form id="filterForm" class="row gy-3 gx-3 align-items-end mb-4">
+    <div class="col-sm-3">
+      <label class="form-label" for="userSelect">User</label>
+      <select id="userSelect" class="form-select">
+        <option value="">All users</option>
+        {% for user in users %}
+        <option value="{{ user['user_id'] }}">
+          {{ user['user_id'] }}{% if user['name'] %} - {{ user['name'] }}{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-sm-3">
+      <label class="form-label" for="startDate">Start date</label>
+      <input type="date" id="startDate" class="form-control">
+    </div>
+    <div class="col-sm-3">
+      <label class="form-label" for="endDate">End date</label>
+      <input type="date" id="endDate" class="form-control">
+    </div>
+    <div class="col-sm-3 d-flex gap-2">
+      <button type="submit" class="btn btn-primary flex-fill">Apply Filters</button>
+    </div>
+  </form>
+
+  <div class="d-flex gap-2 mb-3">
+    <button id="syncButton" class="btn btn-success">Sync Data</button>
+    <button id="exportButton" class="btn btn-outline-secondary">Export to Excel</button>
+  </div>
+
+  <div id="userCards" class="d-flex flex-column gap-4 mb-4"></div>
+
+  <section>
+    <h5>Working Hours Trend</h5>
+    <canvas id="hoursChart" height="80"></canvas>
+  </section>
+</main>
+
+<div class="modal fade" id="makeupModal" tabindex="-1" aria-labelledby="makeupModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="makeupModalLabel">Nhập giờ bù</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="makeupForm" class="modal-body">
+        <input type="hidden" id="makeupUserId">
+        <input type="hidden" id="makeupDate">
+        <div class="mb-3">
+          <label class="form-label">Nhân viên</label>
+          <input type="text" id="makeupUserInfo" class="form-control" readonly>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="makeupHours">Số giờ bù</label>
+          <input type="number" step="0.25" min="0" id="makeupHours" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="makeupNote">Ghi chú</label>
+          <textarea id="makeupNote" class="form-control" rows="2" placeholder="Lý do bù (tùy chọn)"></textarea>
+        </div>
+        <div class="modal-footer px-0">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+          <button type="submit" class="btn btn-primary">Lưu giờ bù</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const userCardsContainer = document.getElementById('userCards');
+  const statusMessage = document.getElementById('statusMessage');
+  const filterForm = document.getElementById('filterForm');
+  const syncButton = document.getElementById('syncButton');
+  const exportButton = document.getElementById('exportButton');
+  const hoursChartCanvas = document.getElementById('hoursChart');
+  const makeupModalElement = document.getElementById('makeupModal');
+  const makeupModal = new bootstrap.Modal(makeupModalElement);
+  const makeupForm = document.getElementById('makeupForm');
+  const makeupUserIdInput = document.getElementById('makeupUserId');
+  const makeupDateInput = document.getElementById('makeupDate');
+  const makeupUserInfoInput = document.getElementById('makeupUserInfo');
+  const makeupHoursInput = document.getElementById('makeupHours');
+  const makeupNoteInput = document.getElementById('makeupNote');
+  const lateCharts = new Map();
+  let hoursChart;
+
+  const getFilterValues = () => ({
+    userId: document.getElementById('userSelect').value,
+    startDate: document.getElementById('startDate').value,
+    endDate: document.getElementById('endDate').value,
+  });
+
+  const hasDateRange = () => {
+    const { startDate, endDate } = getFilterValues();
+    return Boolean(startDate && endDate);
+  };
+
+  const formatHours = (value) => {
+    if (value === null || value === undefined) return '';
+    const num = Number(value);
+    if (Number.isNaN(num)) return '';
+    return num.toFixed(2);
+  };
+
+  const formatTime = (value) => {
+    if (!value) return '';
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) {
+      const match = value.match(/T(\d{2}:\d{2})/);
+      return match ? match[1] : value;
+    }
+    return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const showStatus = (message, type = 'info') => {
+    statusMessage.className = `alert alert-${type}`;
+    statusMessage.textContent = message;
+    statusMessage.classList.remove('d-none');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => statusMessage.classList.add('d-none'), 5000);
+  };
+
+  const buildQuery = () => {
+    const params = new URLSearchParams();
+    const { userId, startDate, endDate } = getFilterValues();
+    if (userId) params.append('user_id', userId);
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    return params;
+  };
+
+  const openMakeupModal = (row) => {
+    makeupUserIdInput.value = row.user_id;
+    makeupDateInput.value = row.date;
+    makeupUserInfoInput.value = `${row.user_id} - ${row.name ?? ''}`.trim();
+    makeupHoursInput.value = row.makeup_hours ?? 0;
+    makeupNoteInput.value = row.makeup_note ?? '';
+    makeupModal.show();
+  };
+
+  const renderActionButton = (row) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm btn-outline-primary';
+    btn.textContent = 'Nhập giờ bù';
+    btn.addEventListener('click', () => openMakeupModal(row));
+    return btn;
+  };
+
+  const destroyUserCharts = () => {
+    lateCharts.forEach((chart) => chart.destroy());
+    lateCharts.clear();
+  };
+
+  const renderUserCards = (data, { emptyMessage } = {}) => {
+    destroyUserCharts();
+    userCardsContainer.innerHTML = '';
+    if (!data.length) {
+      const emptyState = document.createElement('div');
+      emptyState.className = 'text-center text-muted py-5 border rounded';
+      emptyState.textContent = emptyMessage || 'Không có dữ liệu trong khoảng thời gian này.';
+      userCardsContainer.appendChild(emptyState);
+      return;
+    }
+
+    const grouped = data.reduce((acc, row) => {
+      const key = row.user_id;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(row);
+      return acc;
+    }, {});
+
+    Object.entries(grouped)
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .forEach(([userId, rows]) => {
+        rows.sort((a, b) => a.date.localeCompare(b.date));
+        const displayName = rows[0].name || `User ${userId}`;
+        const department = rows[0].department || '';
+
+        const onTimeDays = rows.filter((row) => !row.is_day_off && Number(row.late_mins) === 0).length;
+        const lateDays = rows.filter((row) => !row.is_day_off && Number(row.late_mins) > 0).length;
+        const offDays = rows.filter((row) => row.is_day_off).length;
+        const workDays = rows.length - offDays;
+        const totalHours = rows.reduce((acc, row) => acc + (Number(row.total_hours) || Number(row.working_hours) || 0), 0);
+        const makeupHoursTotal = rows.reduce((acc, row) => acc + (Number(row.makeup_hours) || 0), 0);
+
+        const card = document.createElement('div');
+        card.className = 'card shadow-sm';
+
+        const cardHeader = document.createElement('div');
+        cardHeader.className = 'card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2';
+        cardHeader.innerHTML = `
+          <div>
+            <h5 class="mb-0">${displayName}</h5>
+            <small class="text-muted">ID: ${userId}${department ? ` • ${department}` : ''}</small>
+          </div>
+          <div class="text-end">
+            <span class="badge bg-primary-subtle text-primary">Tổng ngày: ${rows.length}</span>
+            <span class="badge bg-success-subtle text-success">Đi làm: ${workDays}</span>
+            <span class="badge bg-danger-subtle text-danger">Nghỉ: ${offDays}</span>
+          </div>
+        `;
+
+        const cardBody = document.createElement('div');
+        cardBody.className = 'card-body';
+
+        const summaryRow = document.createElement('div');
+        summaryRow.className = 'row g-3 align-items-center mb-3';
+
+        const chartCol = document.createElement('div');
+        chartCol.className = 'col-lg-4';
+        const chartCanvasId = `lateChartUser-${userId}`;
+        chartCol.innerHTML = `<canvas id="${chartCanvasId}" height="160"></canvas>`;
+
+        const statsCol = document.createElement('div');
+        statsCol.className = 'col-lg-8';
+        statsCol.innerHTML = `
+          <div class="row g-3 text-center mini-stats">
+            <div class="col-6 col-md-3">
+              <div class="stat-box">
+                <span class="stat-label">Tổng giờ</span>
+                <span class="stat-value">${formatHours(totalHours)}</span>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="stat-box">
+                <span class="stat-label">Giờ bù</span>
+                <span class="stat-value">${formatHours(makeupHoursTotal)}</span>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="stat-box">
+                <span class="stat-label">Đi muộn</span>
+                <span class="stat-value text-danger">${lateDays}</span>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="stat-box">
+                <span class="stat-label">Đúng giờ</span>
+                <span class="stat-value text-success">${onTimeDays}</span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        summaryRow.appendChild(chartCol);
+        summaryRow.appendChild(statsCol);
+
+        const table = document.createElement('table');
+        table.className = 'table table-sm table-striped align-middle';
+        table.innerHTML = `
+          <thead class="table-light">
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Check In</th>
+              <th scope="col">Check Out</th>
+              <th scope="col">Working Hours</th>
+              <th scope="col">Make-up (hrs)</th>
+              <th scope="col">Total (hrs)</th>
+              <th scope="col">Late (mins)</th>
+              <th scope="col">Early Leave (mins)</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
+        const tbody = table.querySelector('tbody');
+
+        rows.forEach((row) => {
+          const tr = document.createElement('tr');
+          if (row.is_weekend) {
+            if (row.weekday === 5 && !row.is_day_off) {
+              tr.classList.add('weekend-worked');
+            } else {
+              tr.classList.add('weekend-row');
+            }
+          } else if (row.is_day_off) {
+            tr.classList.add('table-danger');
+          }
+
+          const totalNotes = [];
+          if (row.makeup_note) {
+            totalNotes.push(`<span class="text-muted small d-block">${row.makeup_note}</span>`);
+          }
+          if (row.weekend_note) {
+            totalNotes.push(`<span class="text-primary small d-block weekend-note">${row.weekend_note}</span>`);
+          }
+
+          const cells = [
+            row.date,
+            row.check_in ? formatTime(row.check_in) : '<span class="missing-entry">Quên chấm công</span>',
+            row.check_out ? formatTime(row.check_out) : '<span class="missing-entry">Quên chấm công</span>',
+            formatHours(row.working_hours),
+            formatHours(row.makeup_hours),
+            `${formatHours(row.total_hours)}${totalNotes.join('')}`,
+            row.late_mins,
+            row.early_leave_mins,
+          ];
+
+          cells.forEach((content, index) => {
+            const td = document.createElement('td');
+            td.innerHTML = content;
+            if ((index === 1 && row.missing_check_in) || (index === 2 && row.missing_check_out)) {
+              td.classList.add('text-nowrap', 'missing-cell');
+            }
+            tr.appendChild(td);
+          });
+
+          const actionCell = document.createElement('td');
+          actionCell.className = 'text-center';
+          actionCell.appendChild(renderActionButton(row));
+          tr.appendChild(actionCell);
+
+          tbody.appendChild(tr);
+        });
+
+        cardBody.appendChild(summaryRow);
+        cardBody.appendChild(table);
+        card.appendChild(cardHeader);
+        card.appendChild(cardBody);
+        userCardsContainer.appendChild(card);
+
+        const chartContext = document.getElementById(chartCanvasId).getContext('2d');
+        const doughnut = new Chart(chartContext, {
+          type: 'doughnut',
+          data: {
+            labels: ['Đúng giờ', 'Đi muộn', 'Nghỉ'],
+            datasets: [{
+              data: [onTimeDays, lateDays, offDays],
+              backgroundColor: ['#198754', '#dc3545', '#6c757d'],
+            }],
+          },
+          options: {
+            plugins: { legend: { position: 'bottom' } },
+            cutout: '65%',
+          },
+        });
+        lateCharts.set(chartCanvasId, doughnut);
+      });
+  };
+
+  const renderHoursChart = (data) => {
+    if (!hoursChart) {
+      hoursChart = new Chart(hoursChartCanvas, {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Working Hours',
+            data: [],
+            backgroundColor: '#0d6efd',
+          }],
+        },
+        options: {
+          scales: {
+            x: { title: { display: true, text: 'Date' } },
+            y: { title: { display: true, text: 'Hours' }, beginAtZero: true },
+          },
+        },
+      });
+    }
+
+    if (!data.length) {
+      hoursChart.data.labels = [];
+      hoursChart.data.datasets[0].data = [];
+      hoursChart.update();
+      return;
+    }
+
+    hoursChart.data.labels = data.map((row) => `${row.user_id} - ${row.date}`);
+    hoursChart.data.datasets[0].data = data.map((row) => Number(row.total_hours ?? row.working_hours ?? 0) || 0);
+    hoursChart.update();
+  };
+
+  const loadSummary = async ({ silent = false } = {}) => {
+    const { startDate, endDate } = getFilterValues();
+    if (!startDate || !endDate) {
+      renderUserCards([], { emptyMessage: 'Chọn khoảng thời gian để xem báo cáo.' });
+      if (!silent) {
+        showStatus('Vui lòng chọn ngày bắt đầu và kết thúc trước khi tải dữ liệu.', 'info');
+      }
+      return;
+    }
+    try {
+      const params = buildQuery();
+      const response = await fetch(`/summary?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to load summary');
+      const data = await response.json();
+      renderUserCards(data);
+      renderHoursChart(data);
+    } catch (error) {
+      showStatus(error.message, 'danger');
+    }
+  };
+
+  filterForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (!hasDateRange()) {
+      renderUserCards([], { emptyMessage: 'Chọn khoảng thời gian để xem báo cáo.' });
+      showStatus('Vui lòng chọn ngày bắt đầu và kết thúc.', 'info');
+      return;
+    }
+    loadSummary();
+  });
+
+  syncButton.addEventListener('click', async () => {
+    syncButton.disabled = true;
+    syncButton.textContent = 'Syncing...';
+    try {
+      const response = await fetch('/sync');
+      const payload = await response.json();
+      if (!response.ok || payload.status !== 'ok') {
+        throw new Error(payload.message || 'Sync failed');
+      }
+      showStatus(`Sync successful. Inserted ${payload.inserted_rows} new records.`, 'success');
+      if (hasDateRange()) {
+        loadSummary({ silent: true });
+      }
+    } catch (error) {
+      showStatus(error.message, 'danger');
+    } finally {
+      syncButton.disabled = false;
+      syncButton.textContent = 'Sync Data';
+    }
+  });
+
+  exportButton.addEventListener('click', () => {
+    if (!hasDateRange()) {
+      showStatus('Vui lòng chọn ngày bắt đầu và kết thúc trước khi xuất Excel.', 'warning');
+      return;
+    }
+    const params = buildQuery();
+    const url = `/export?${params.toString()}`;
+    window.open(url, '_blank');
+  });
+
+  makeupForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const payload = {
+      user_id: Number(makeupUserIdInput.value),
+      date: makeupDateInput.value,
+      hours: Number(makeupHoursInput.value),
+      note: makeupNoteInput.value.trim() || null,
+    };
+    if (!payload.date || Number.isNaN(payload.user_id) || Number.isNaN(payload.hours)) {
+      showStatus('Vui lòng nhập thông tin giờ bù hợp lệ.', 'warning');
+      return;
+    }
+
+    try {
+      const response = await fetch('/makeup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok || result.status !== 'ok') {
+        throw new Error(result.message || 'Không thể lưu giờ bù');
+      }
+      makeupModal.hide();
+      showStatus('Đã lưu giờ bù thành công.', 'success');
+      if (hasDateRange()) {
+        loadSummary({ silent: true });
+      }
+    } catch (error) {
+      showStatus(error.message, 'danger');
+    }
+  });
+
+  renderUserCards([], { emptyMessage: 'Chọn khoảng thời gian để xem báo cáo.' });
+</script>
+{% endblock %}
