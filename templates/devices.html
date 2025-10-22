@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Thiết bị | MayChamCong{% endblock %}
+{% block title %}Devices | Attendance Sync{% endblock %}
 
 {% block content %}
 <main class="container py-4">
@@ -8,7 +8,7 @@
     <div class="col-lg-5">
       <div class="card shadow-sm">
         <div class="card-header bg-white">
-          <h5 class="mb-0">Thêm máy chấm công</h5>
+          <h5 class="mb-0">Add attendance device</h5>
         </div>
         <div class="card-body">
           {% if error %}
@@ -16,28 +16,28 @@
           {% endif %}
           <form method="post" action="{{ url_for('create_device') }}" id="deviceForm">
             <div class="mb-3">
-              <label class="form-label" for="deviceName">Tên thiết bị <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="deviceName" name="name" placeholder="VD: Máy chấm công tầng 3" value="{{ form_data.name if form_data else '' }}" required>
+              <label class="form-label" for="deviceName">Device name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="deviceName" name="name" placeholder="e.g. Attendance reader - Floor 3" value="{{ form_data.name if form_data else '' }}" required>
             </div>
             <div class="mb-3">
-              <label class="form-label" for="deviceMode">Chế độ</label>
+              <label class="form-label" for="deviceMode">Mode</label>
               <select class="form-select" id="deviceMode" name="mode">
                 {% set selected_mode = (form_data.mode if form_data else 'manual') %}
                 <option value="manual" {% if selected_mode == 'manual' %}selected{% endif %}>Manual</option>
                 <option value="auto" {% if selected_mode == 'auto' %}selected{% endif %}>Auto</option>
               </select>
-              <div class="form-text">Chọn "Auto" nếu thiết bị hỗ trợ đồng bộ tự động.</div>
+              <div class="form-text">Choose "Auto" if the device supports automatic syncing.</div>
             </div>
             <div class="mb-3">
-              <label class="form-label" for="deviceIp">Địa chỉ IP</label>
+              <label class="form-label" for="deviceIp">IP address</label>
               <input type="text" class="form-control" id="deviceIp" name="ip" placeholder="192.168.1.201" value="{{ form_data.ip if form_data else '' }}">
             </div>
             <div class="mb-3">
-              <label class="form-label" for="devicePort">Cổng kết nối</label>
+              <label class="form-label" for="devicePort">Port</label>
               <input type="number" class="form-control" id="devicePort" name="port" placeholder="4370" value="{{ form_data.port if form_data else '' }}">
             </div>
             <div class="d-grid">
-              <button type="submit" class="btn btn-primary">Lưu thiết bị</button>
+              <button type="submit" class="btn btn-primary">Save device</button>
             </div>
           </form>
         </div>
@@ -47,8 +47,8 @@
     <div class="col-lg-7">
       <div class="card shadow-sm">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
-          <h5 class="mb-0">Danh sách thiết bị</h5>
-          <span class="badge bg-secondary">{{ devices|length }} thiết bị</span>
+          <h5 class="mb-0">Device list</h5>
+          <span class="badge bg-secondary">{{ devices|length }} devices</span>
         </div>
         <div class="card-body p-0">
           {% if devices %}
@@ -57,11 +57,11 @@
               <thead class="table-light">
                 <tr>
                   <th scope="col">#</th>
-                  <th scope="col">Tên</th>
-                  <th scope="col">Chế độ</th>
+                  <th scope="col">Name</th>
+                  <th scope="col">Mode</th>
                   <th scope="col">IP</th>
                   <th scope="col">Port</th>
-                  <th scope="col" class="text-end">Thao tác</th>
+                  <th scope="col" class="text-end">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -79,8 +79,8 @@
                   <td>{{ device.ip or '-' }}</td>
                   <td>{{ device.port or '-' }}</td>
                   <td class="text-end">
-                    <form method="post" action="{{ url_for('remove_device', device_id=device.id) }}" onsubmit="return confirm('Xóa thiết bị này?');">
-                      <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
+                    <form method="post" action="{{ url_for('remove_device', device_id=device.id) }}" onsubmit="return confirm('Delete this device?');">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                     </form>
                   </td>
                 </tr>
@@ -90,7 +90,7 @@
           </div>
           {% else %}
           <div class="p-4 text-center text-muted">
-            Chưa có thiết bị nào. Hãy thêm thiết bị mới bên trái.
+            No devices yet. Add a new device using the form on the left.
           </div>
           {% endif %}
         </div>

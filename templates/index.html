@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard | MayChamCong{% endblock %}
+{% block title %}Dashboard | Attendance Sync{% endblock %}
 
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
@@ -52,27 +52,27 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="makeupModalLabel">Nhập giờ bù</h5>
+        <h5 class="modal-title" id="makeupModalLabel">Adjust Make-up Hours</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <form id="makeupForm" class="modal-body">
         <input type="hidden" id="makeupUserId">
         <input type="hidden" id="makeupDate">
         <div class="mb-3">
-          <label class="form-label">Nhân viên</label>
+          <label class="form-label">Employee</label>
           <input type="text" id="makeupUserInfo" class="form-control" readonly>
         </div>
         <div class="mb-3">
-          <label class="form-label" for="makeupHours">Số giờ bù</label>
+          <label class="form-label" for="makeupHours">Make-up hours</label>
           <input type="number" step="0.25" min="0" id="makeupHours" class="form-control" required>
         </div>
         <div class="mb-3">
-          <label class="form-label" for="makeupNote">Ghi chú</label>
-          <textarea id="makeupNote" class="form-control" rows="2" placeholder="Lý do bù (tùy chọn)"></textarea>
+          <label class="form-label" for="makeupNote">Notes</label>
+          <textarea id="makeupNote" class="form-control" rows="2" placeholder="Optional reason"></textarea>
         </div>
         <div class="modal-footer px-0">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-          <button type="submit" class="btn btn-primary">Lưu giờ bù</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save make-up hours</button>
         </div>
       </form>
     </div>
@@ -157,7 +157,7 @@
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn btn-sm btn-outline-primary';
-    btn.textContent = 'Nhập giờ bù';
+    btn.textContent = 'Adjust hours';
     btn.addEventListener('click', () => openMakeupModal(row));
     return btn;
   };
@@ -173,7 +173,7 @@
     if (!data.length) {
       const emptyState = document.createElement('div');
       emptyState.className = 'text-center text-muted py-5 border rounded';
-      emptyState.textContent = emptyMessage || 'Không có dữ liệu trong khoảng thời gian này.';
+      emptyState.textContent = emptyMessage || 'No data available for this date range.';
       userCardsContainer.appendChild(emptyState);
       return;
     }
@@ -210,9 +210,9 @@
             <small class="text-muted">ID: ${userId}${department ? ` • ${department}` : ''}</small>
           </div>
           <div class="text-end">
-            <span class="badge bg-primary-subtle text-primary">Tổng ngày: ${rows.length}</span>
-            <span class="badge bg-success-subtle text-success">Đi làm: ${workDays}</span>
-            <span class="badge bg-danger-subtle text-danger">Nghỉ: ${offDays}</span>
+            <span class="badge bg-primary-subtle text-primary">Total days: ${rows.length}</span>
+            <span class="badge bg-success-subtle text-success">Working: ${workDays}</span>
+            <span class="badge bg-danger-subtle text-danger">Off: ${offDays}</span>
           </div>
         `;
 
@@ -233,25 +233,25 @@
           <div class="row g-3 text-center mini-stats">
             <div class="col-6 col-md-3">
               <div class="stat-box">
-                <span class="stat-label">Tổng giờ</span>
+                <span class="stat-label">Total hours</span>
                 <span class="stat-value">${formatHours(totalHours)}</span>
               </div>
             </div>
             <div class="col-6 col-md-3">
               <div class="stat-box">
-                <span class="stat-label">Giờ bù</span>
+                <span class="stat-label">Make-up hours</span>
                 <span class="stat-value">${formatHours(makeupHoursTotal)}</span>
               </div>
             </div>
             <div class="col-6 col-md-3">
               <div class="stat-box">
-                <span class="stat-label">Đi muộn</span>
+                <span class="stat-label">Late days</span>
                 <span class="stat-value text-danger">${lateDays}</span>
               </div>
             </div>
             <div class="col-6 col-md-3">
               <div class="stat-box">
-                <span class="stat-label">Đúng giờ</span>
+                <span class="stat-label">On time</span>
                 <span class="stat-value text-success">${onTimeDays}</span>
               </div>
             </div>
@@ -303,8 +303,8 @@
 
           const cells = [
             row.date,
-            row.check_in ? formatTime(row.check_in) : '<span class="missing-entry">Quên chấm công</span>',
-            row.check_out ? formatTime(row.check_out) : '<span class="missing-entry">Quên chấm công</span>',
+            row.check_in ? formatTime(row.check_in) : '<span class="missing-entry">Missing check-in</span>',
+            row.check_out ? formatTime(row.check_out) : '<span class="missing-entry">Missing check-out</span>',
             formatHours(row.working_hours),
             formatHours(row.makeup_hours),
             `${formatHours(row.total_hours)}${totalNotes.join('')}`,
@@ -339,7 +339,7 @@
         const doughnut = new Chart(chartContext, {
           type: 'doughnut',
           data: {
-            labels: ['Đúng giờ', 'Đi muộn', 'Nghỉ'],
+            labels: ['On time', 'Late', 'Off'],
             datasets: [{
               data: [onTimeDays, lateDays, offDays],
               backgroundColor: ['#198754', '#dc3545', '#6c757d'],
@@ -390,9 +390,9 @@
   const loadSummary = async ({ silent = false } = {}) => {
     const { startDate, endDate } = getFilterValues();
     if (!startDate || !endDate) {
-      renderUserCards([], { emptyMessage: 'Chọn khoảng thời gian để xem báo cáo.' });
+      renderUserCards([], { emptyMessage: 'Select a date range to view the report.' });
       if (!silent) {
-        showStatus('Vui lòng chọn ngày bắt đầu và kết thúc trước khi tải dữ liệu.', 'info');
+        showStatus('Select start and end dates before loading data.', 'info');
       }
       return;
     }
@@ -411,8 +411,8 @@
   filterForm.addEventListener('submit', (event) => {
     event.preventDefault();
     if (!hasDateRange()) {
-      renderUserCards([], { emptyMessage: 'Chọn khoảng thời gian để xem báo cáo.' });
-      showStatus('Vui lòng chọn ngày bắt đầu và kết thúc.', 'info');
+      renderUserCards([], { emptyMessage: 'Select a date range to view the report.' });
+      showStatus('Please choose both a start date and an end date.', 'info');
       return;
     }
     loadSummary();
@@ -441,7 +441,7 @@
 
   exportButton.addEventListener('click', () => {
     if (!hasDateRange()) {
-      showStatus('Vui lòng chọn ngày bắt đầu và kết thúc trước khi xuất Excel.', 'warning');
+      showStatus('Select start and end dates before exporting to Excel.', 'warning');
       return;
     }
     const params = buildQuery();
@@ -458,7 +458,7 @@
       note: makeupNoteInput.value.trim() || null,
     };
     if (!payload.date || Number.isNaN(payload.user_id) || Number.isNaN(payload.hours)) {
-      showStatus('Vui lòng nhập thông tin giờ bù hợp lệ.', 'warning');
+      showStatus('Please provide valid make-up hours details.', 'warning');
       return;
     }
 
@@ -470,10 +470,10 @@
       });
       const result = await response.json();
       if (!response.ok || result.status !== 'ok') {
-        throw new Error(result.message || 'Không thể lưu giờ bù');
+        throw new Error(result.message || 'Unable to save make-up hours.');
       }
       makeupModal.hide();
-      showStatus('Đã lưu giờ bù thành công.', 'success');
+      showStatus('Make-up hours saved successfully.', 'success');
       if (hasDateRange()) {
         loadSummary({ silent: true });
       }
@@ -482,6 +482,6 @@
     }
   });
 
-  renderUserCards([], { emptyMessage: 'Chọn khoảng thời gian để xem báo cáo.' });
+  renderUserCards([], { emptyMessage: 'Select a date range to view the report.' });
 </script>
 {% endblock %}

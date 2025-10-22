@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Kết nối thiết bị | MayChamCong{% endblock %}
+{% block title %}Connect Device | Attendance Sync{% endblock %}
 
 {% block content %}
 <main class="container py-5">
@@ -8,15 +8,15 @@
     <div class="col-12">
       <div class="bg-dark text-white rounded-4 p-4 p-md-5 shadow-sm d-flex flex-column flex-md-row align-items-center justify-content-between">
         <div>
-          <h1 class="display-6 fw-bold mb-2">Kết nối thiết bị ZKTeco</h1>
-          <p class="mb-0 text-white-50">Hoàn tất bước kết nối trước khi truy cập dashboard. Kiểm tra, thử nghiệm và lưu cấu hình thiết bị của bạn trong vài giây.</p>
+          <h1 class="display-6 fw-bold mb-2">Connect your ZKTeco terminal</h1>
+          <p class="mb-0 text-white-50">Complete this setup before visiting the dashboard. Discover, test, and save your device configuration in seconds.</p>
         </div>
         <div class="mt-3 mt-md-0 d-flex gap-2">
           <button id="refreshDevicesBtn" class="btn btn-outline-light btn-lg">
-            <span class="me-2" aria-hidden="true">🔄</span> Tìm thiết bị đã lưu
+            <span class="me-2" aria-hidden="true">🔄</span> Load saved devices
           </button>
           <button id="disconnectBtn" class="btn btn-outline-light btn-lg d-none">
-            <span class="me-2" aria-hidden="true">🧹</span> Ngắt kết nối
+            <span class="me-2" aria-hidden="true">🧹</span> Disconnect
           </button>
         </div>
       </div>
@@ -25,44 +25,44 @@
     <div class="col-lg-6">
       <div class="card shadow-lg border-0 h-100">
         <div class="card-body p-4">
-          <h2 class="h4 mb-3">Thông tin thiết bị</h2>
-          <p class="text-muted">Nhập địa chỉ IP và cổng kết nối của máy chấm công, sau đó thử kết nối để đảm bảo thông số chính xác.</p>
+          <h2 class="h4 mb-3">Device details</h2>
+          <p class="text-muted">Enter the IP address and connection port, then run a test to ensure the configuration is correct.</p>
           <div id="connectionAlert" class="alert d-none" role="alert"></div>
           <form id="connectionForm" class="row g-3">
             <div class="col-12">
-              <label class="form-label" for="deviceHost">Địa chỉ IP <span class="text-danger">*</span></label>
-              <input type="text" id="deviceHost" name="host" class="form-control form-control-lg" placeholder="Ví dụ: 192.168.0.201" value="{{ active_config.host if active_config else '' }}" required>
+              <label class="form-label" for="deviceHost">IP address <span class="text-danger">*</span></label>
+              <input type="text" id="deviceHost" name="host" class="form-control form-control-lg" placeholder="Example: 192.168.0.201" value="{{ active_config.host if active_config else '' }}" required>
             </div>
             <div class="col-md-6">
-              <label class="form-label" for="devicePort">Cổng <span class="text-danger">*</span></label>
+              <label class="form-label" for="devicePort">Port <span class="text-danger">*</span></label>
               <input type="number" id="devicePort" name="port" class="form-control form-control-lg" placeholder="4370" value="{{ active_config.port if active_config else 4370 }}" required>
             </div>
             <div class="col-md-6">
-              <label class="form-label" for="devicePassword">Mật khẩu (nếu có)</label>
+              <label class="form-label" for="devicePassword">Password (optional)</label>
               <input type="number" id="devicePassword" name="password" class="form-control form-control-lg" placeholder="0" value="{{ active_config.password if active_config else 0 }}">
             </div>
             <div class="col-md-6">
-              <label class="form-label" for="deviceTimeout">Timeout (giây)</label>
+              <label class="form-label" for="deviceTimeout">Timeout (seconds)</label>
               <input type="number" id="deviceTimeout" name="timeout" class="form-control form-control-lg" placeholder="5" value="{{ active_config.timeout if active_config else 5 }}">
             </div>
             <div class="col-md-6 d-flex align-items-end">
               <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" role="switch" id="forceUdpSwitch" {% if active_config and active_config.force_udp %}checked{% endif %}>
-                <label class="form-check-label" for="forceUdpSwitch">Buộc sử dụng UDP</label>
+                <label class="form-check-label" for="forceUdpSwitch">Force UDP</label>
               </div>
             </div>
             <div class="col-12 d-grid gap-3 d-md-flex">
               <button type="button" id="testButton" class="btn btn-outline-primary btn-lg flex-fill">
-                <span class="me-2" aria-hidden="true">🧪</span> Test kết nối
+                <span class="me-2" aria-hidden="true">🧪</span> Test connection
               </button>
               <button type="button" id="connectButton" class="btn btn-primary btn-lg flex-fill" disabled>
-                <span class="me-2" aria-hidden="true">🔌</span> Kết nối và tiếp tục
+                <span class="me-2" aria-hidden="true">🔌</span> Connect & continue
               </button>
             </div>
           </form>
           <div id="testResult" class="card bg-light border-0 mt-4 d-none">
             <div class="card-body">
-              <h3 class="h6 text-uppercase text-muted mb-3">Thông tin thiết bị</h3>
+              <h3 class="h6 text-uppercase text-muted mb-3">Device information</h3>
               <dl class="row mb-0">
                 <dt class="col-sm-4 text-muted">Serial</dt>
                 <dd class="col-sm-8" id="resultSerial">-</dd>
@@ -78,18 +78,18 @@
     <div class="col-lg-6">
       <div class="card shadow-lg border-0 mb-4">
         <div class="card-body p-4">
-          <h2 class="h5 mb-3">Thiết bị đã lưu</h2>
-          <p class="text-muted">Chọn nhanh cấu hình đã lưu trước đó để điền vào biểu mẫu.</p>
+          <h2 class="h5 mb-3">Saved devices</h2>
+          <p class="text-muted">Pick a previously stored configuration to auto-fill the form.</p>
           <div id="savedDevices" class="list-group list-group-flush border rounded-3"></div>
           <div id="noDevicesState" class="text-center text-muted py-4{% if devices %} d-none{% endif %}">
-            <p class="mb-0">Chưa có thiết bị nào. Hãy thêm ở trang "Thiết bị" hoặc lưu cấu hình mới.</p>
+            <p class="mb-0">No saved devices yet. Add one on the Devices page or save a new configuration here.</p>
           </div>
         </div>
       </div>
       <div class="card shadow-lg border-0">
         <div class="card-body p-4">
           <h2 class="h5 mb-3">Supported models</h2>
-          <p class="text-muted">Các dòng máy ZKTeco được kiểm nghiệm tương thích với hệ thống.</p>
+          <p class="text-muted">ZKTeco models verified to work smoothly with this project.</p>
           <div class="row g-3">
             {% for model in supported_models %}
             <div class="col-sm-6">
@@ -176,9 +176,9 @@
       item.innerHTML = `
         <div>
           <div class="fw-semibold">${device.name}</div>
-          <small class="text-muted">${device.ip || 'Không có IP'} • Port ${device.port || '-'}</small>
+          <small class="text-muted">${device.ip || 'No IP set'} • Port ${device.port || '-'}</small>
         </div>
-        <span class="text-primary fw-semibold">Chọn</span>
+        <span class="text-primary fw-semibold">Select</span>
       `;
       item.addEventListener('click', () => populateForm(device));
       savedDevicesContainer.appendChild(item);
@@ -188,16 +188,16 @@
   const loadSavedDevices = async () => {
     try {
       refreshDevicesBtn.classList.add('disabled');
-      refreshDevicesBtn.textContent = 'Đang tìm...';
+      refreshDevicesBtn.textContent = 'Searching...';
       const response = await fetch('{{ url_for("api_devices") }}');
-      if (!response.ok) throw new Error('Không thể tải danh sách thiết bị.');
+      if (!response.ok) throw new Error('Unable to load devices.');
       const data = await response.json();
       renderDevices(data.devices || []);
     } catch (error) {
       showAlert(error.message, 'danger');
     } finally {
       refreshDevicesBtn.classList.remove('disabled');
-      refreshDevicesBtn.textContent = '🔄 Tìm thiết bị đã lưu';
+      refreshDevicesBtn.textContent = '🔄 Load saved devices';
     }
   };
 
@@ -218,11 +218,11 @@
     hideAlert();
     const payload = getFormData();
     if (!payload.host) {
-      showAlert('Vui lòng nhập địa chỉ IP của thiết bị.', 'warning');
+      showAlert('Please enter the device IP address.', 'warning');
       return;
     }
     testButton.disabled = true;
-    testButton.textContent = 'Đang kiểm tra...';
+    testButton.textContent = 'Testing...';
     connectButton.disabled = true;
     resultCard.classList.add('d-none');
     try {
@@ -233,9 +233,9 @@
       });
       const data = await response.json();
       if (!response.ok || data.status === 'error') {
-        throw new Error(data.message || 'Không thể test kết nối.');
+        throw new Error(data.message || 'Unable to test the connection.');
       }
-      showAlert('Kết nối thành công! Bạn có thể lưu cấu hình.', 'success');
+      showAlert('Connection successful! You can now save the configuration.', 'success');
       resultCard.classList.remove('d-none');
       serialField.textContent = data.serial || '-';
       firmwareField.textContent = data.firmware || '-';
@@ -246,19 +246,19 @@
       lastTestSuccess = false;
     } finally {
       testButton.disabled = false;
-      testButton.textContent = '🧪 Test kết nối';
+      testButton.textContent = '🧪 Test connection';
     }
   });
 
   connectButton.addEventListener('click', async () => {
     if (!lastTestSuccess) {
-      showAlert('Vui lòng test kết nối trước khi lưu.', 'warning');
+      showAlert('Please run a connection test before saving.', 'warning');
       return;
     }
 
     const payload = getFormData();
     connectButton.disabled = true;
-    connectButton.textContent = 'Đang kết nối...';
+    connectButton.textContent = 'Connecting...';
     try {
       const response = await fetch('{{ url_for("api_connect_device") }}', {
         method: 'POST',
@@ -267,15 +267,15 @@
       });
       const data = await response.json();
       if (!response.ok || data.status === 'error') {
-        throw new Error(data.message || 'Không thể kết nối thiết bị.');
+        throw new Error(data.message || 'Unable to connect to the device.');
       }
-      showAlert('Đã lưu cấu hình! Đang chuyển đến dashboard...', 'success');
+      showAlert('Configuration saved! Redirecting to the dashboard...', 'success');
       setTimeout(() => window.location.href = '{{ url_for("index") }}', 1200);
     } catch (error) {
       showAlert(error.message, 'danger');
     } finally {
       connectButton.disabled = false;
-      connectButton.textContent = '🔌 Kết nối và tiếp tục';
+      connectButton.textContent = '🔌 Connect & continue';
     }
   });
 
@@ -283,8 +283,8 @@
     try {
       disconnectButton.disabled = true;
       const response = await fetch('{{ url_for("api_disconnect_device") }}', { method: 'POST' });
-      if (!response.ok) throw new Error('Không thể ngắt kết nối hiện tại.');
-      showAlert('Đã ngắt kết nối. Vui lòng cấu hình lại thiết bị.', 'info');
+      if (!response.ok) throw new Error('Unable to disconnect the current device.');
+      showAlert('Device disconnected. Configure a new one to continue.', 'info');
       disconnectButton.classList.add('d-none');
       lastTestSuccess = false;
       connectButton.disabled = true;

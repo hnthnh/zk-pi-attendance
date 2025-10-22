@@ -127,7 +127,7 @@ def test_connection(
             "serial": serial,
         }
     except Exception as exc:
-        raise SyncError(f"Không thể kết nối thiết bị: {exc}") from exc
+        raise SyncError(f"Unable to connect to the device: {exc}") from exc
     finally:
         if connection:
             try:

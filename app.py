@@ -114,7 +114,7 @@ def create_app() -> Flask:
         config = _get_session_device_config()
         if not config:
             return (
-                jsonify({"status": "error", "message": "Vui lòng kết nối thiết bị trước khi đồng bộ."}),
+                jsonify({"status": "error", "message": "Please connect a device before syncing."}),
                 412,
             )
         try:
@@ -234,10 +234,10 @@ def create_app() -> Flask:
         try:
             user_id = int(payload.get("user_id"))
         except (TypeError, ValueError):
-            return jsonify({"status": "error", "message": "user_id phải là số"}), 400
+            return jsonify({"status": "error", "message": "user_id must be a number."}), 400
 
         if get_user(user_id):
-            return jsonify({"status": "error", "message": "User đã tồn tại"}), 409
+            return jsonify({"status": "error", "message": "User already exists."}), 409
 
         name = payload.get("name") or None
         department = payload.get("department") or None
@@ -249,7 +249,7 @@ def create_app() -> Flask:
     @app.put("/api/users/<int:user_id>")
     def update_user(user_id: int):
         if not get_user(user_id):
-            return jsonify({"status": "error", "message": "User không tồn tại"}), 404
+            return jsonify({"status": "error", "message": "User not found."}), 404
 
         payload = request.get_json(silent=True) or {}
         name = payload.get("name")
@@ -262,7 +262,7 @@ def create_app() -> Flask:
     @app.delete("/api/users/<int:user_id>")
     def remove_user(user_id: int):
         if not get_user(user_id):
-            return jsonify({"status": "error", "message": "User không tồn tại"}), 404
+            return jsonify({"status": "error", "message": "User not found."}), 404
 
         delete_user(user_id)
         return jsonify({"status": "ok"})
@@ -277,16 +277,16 @@ def create_app() -> Flask:
 
         errors: list[str] = []
         if not name:
-            errors.append("Tên thiết bị không được bỏ trống.")
+            errors.append("Device name cannot be empty.")
         if mode not in {"auto", "manual"}:
-            errors.append("Chế độ thiết bị không hợp lệ.")
+            errors.append("Device mode is invalid.")
 
         port: Optional[int] = None
         if port_raw:
             try:
                 port = int(port_raw)
             except ValueError:
-                errors.append("Port phải là số.")
+                errors.append("Port must be a number.")
 
         if errors:
             devices = [dict(row) for row in fetch_devices()]
@@ -338,11 +338,11 @@ def create_app() -> Flask:
         force_udp = payload.get("force_udp")
 
         if not host:
-            return jsonify({"status": "error", "message": "Vui lòng nhập địa chỉ IP của thiết bị."}), 400
+            return jsonify({"status": "error", "message": "Please provide the device IP address."}), 400
         try:
             port_int = int(port) if port is not None else None
         except (TypeError, ValueError):
-            return jsonify({"status": "error", "message": "Port phải là số."}), 400
+            return jsonify({"status": "error", "message": "Port must be a number."}), 400
 
         try:
             result = test_connection(
@@ -366,11 +366,11 @@ def create_app() -> Flask:
         force_udp = payload.get("force_udp", False)
 
         if not host:
-            return jsonify({"status": "error", "message": "Địa chỉ IP không được bỏ trống."}), 400
+            return jsonify({"status": "error", "message": "IP address is required."}), 400
         try:
             port_int = int(port)
         except (TypeError, ValueError):
-            return jsonify({"status": "error", "message": "Port phải là số."}), 400
+            return jsonify({"status": "error", "message": "Port must be a number."}), 400
 
         try:
             test_connection(

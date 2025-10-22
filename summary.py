@@ -201,7 +201,7 @@ def get_daily_summary(
             row["is_weekend"] = row["weekday"] >= 5
             row["worked_on_weekend"] = row["is_weekend"] and not row["is_day_off"]
             if row["weekday"] == 5 and not row["is_day_off"]:
-                row["weekend_note"] = "Đi làm thứ 7"
+                row["weekend_note"] = "Worked on Saturday"
             else:
                 row["weekend_note"] = None
 
