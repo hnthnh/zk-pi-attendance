@@ -39,8 +39,8 @@ Attendance Sync is a Flask-based web application that downloads punches from a Z
 ## Getting Started
 
 ```bash
-git clone https://github.com/your-org/attendance-sync.git
-cd attendance-sync/MayChamCongApp
+git clone https://github.com/hnthnh/zk-pi-attendance.git
+cd zk-pi-attendance/MayChamCongApp
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install --upgrade pip
