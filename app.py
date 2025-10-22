@@ -1,9 +1,20 @@
 from __future__ import annotations
 
 import io
+import os
 from datetime import datetime
-from flask import Flask, jsonify, render_template, request, send_file, redirect, url_for
 from typing import Optional
+
+from flask import (
+    Flask,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
 
 from db import (
     delete_device,
@@ -17,22 +28,79 @@ from db import (
     upsert_user,
 )
 from summary import get_daily_summary, summary_dataframe
-from zk_sync import SyncError, sync_attendance
+from zk_sync import SUPPORTED_MODELS, SyncError, sync_attendance, test_connection
+
+
+REQUIRED_DEVICE_KEYS = {"host", "port", "timeout", "password", "force_udp"}
+TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+def _parse_bool(value: Optional[object]) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return value.strip().lower() in TRUE_VALUES
+    return bool(value)
+
+
+def _get_session_device_config() -> Optional[dict]:
+    config = session.get("device_config")
+    if not isinstance(config, dict):
+        return None
+    if not REQUIRED_DEVICE_KEYS.issubset(config.keys()):
+        return None
+    if not config.get("host"):
+        return None
+    try:
+        config["port"] = int(config["port"])
+        config["timeout"] = int(config["timeout"])
+        config["password"] = int(config["password"])
+        config["force_udp"] = _parse_bool(config["force_udp"])
+    except (TypeError, ValueError):
+        return None
+    return config
+
+
+def _ensure_device_connection():
+    config = _get_session_device_config()
+    if not config:
+        return None, redirect(url_for("connect_device"))
+    return config, None
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config["JSON_SORT_KEYS"] = False
+    app.secret_key = os.environ.get("FLASK_SECRET_KEY", "maychamcong-secret-key")
 
     init_db()
 
     @app.get("/")
     def index():
+        config, redirect_response = _ensure_device_connection()
+        if redirect_response:
+            return redirect_response
         users = [dict(row) for row in fetch_users()]
-        return render_template("index.html", users=users)
+        return render_template("index.html", users=users, device_config=config)
+
+    @app.get("/connect")
+    def connect_device():
+        devices = [dict(row) for row in fetch_devices()]
+        current_config = _get_session_device_config()
+        return render_template(
+            "connect.html",
+            devices=devices,
+            supported_models=SUPPORTED_MODELS,
+            active_config=current_config,
+        )
 
     @app.get("/employees")
     def employees():
+        _, redirect_response = _ensure_device_connection()
+        if redirect_response:
+            return redirect_response
         users = [dict(row) for row in fetch_users()]
         return render_template("employees.html", users=users)
 
@@ -43,8 +111,20 @@ def create_app() -> Flask:
 
     @app.get("/sync")
     def sync():
+        config = _get_session_device_config()
+        if not config:
+            return (
+                jsonify({"status": "error", "message": "Vui lòng kết nối thiết bị trước khi đồng bộ."}),
+                412,
+            )
         try:
-            result = sync_attendance()
+            result = sync_attendance(
+                host=config["host"],
+                port=config["port"],
+                password=config["password"],
+                timeout=config["timeout"],
+                force_udp=config["force_udp"],
+            )
             return jsonify(result)
         except SyncError as exc:
             return jsonify({"status": "error", "message": str(exc)}), 500
@@ -235,6 +315,90 @@ def create_app() -> Flask:
     def remove_device(device_id: int):
         delete_device(device_id)
         return redirect(url_for("devices"))
+
+    @app.get("/api/devices")
+    def api_devices():
+        devices = [dict(row) for row in fetch_devices()]
+        return jsonify({"devices": devices})
+
+    @app.get("/api/device/current")
+    def api_current_device():
+        config = _get_session_device_config()
+        if not config:
+            return jsonify({"connected": False})
+        return jsonify({"connected": True, "config": config})
+
+    @app.post("/api/device/test")
+    def api_test_device():
+        payload = request.get_json(silent=True) or {}
+        host = (payload.get("host") or payload.get("ip") or "").strip()
+        port = payload.get("port")
+        password = payload.get("password")
+        timeout = payload.get("timeout")
+        force_udp = payload.get("force_udp")
+
+        if not host:
+            return jsonify({"status": "error", "message": "Vui lòng nhập địa chỉ IP của thiết bị."}), 400
+        try:
+            port_int = int(port) if port is not None else None
+        except (TypeError, ValueError):
+            return jsonify({"status": "error", "message": "Port phải là số."}), 400
+
+        try:
+            result = test_connection(
+                host=host,
+                port=port_int,
+                password=int(password) if password not in (None, "") else None,
+                timeout=int(timeout) if timeout not in (None, "") else None,
+                force_udp=_parse_bool(force_udp) if force_udp is not None else None,
+            )
+            return jsonify(result)
+        except SyncError as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 400
+
+    @app.post("/api/device/connect")
+    def api_connect_device():
+        payload = request.get_json(silent=True) or {}
+        host = (payload.get("host") or "").strip()
+        port = payload.get("port")
+        password = payload.get("password", 0)
+        timeout = payload.get("timeout", 5)
+        force_udp = payload.get("force_udp", False)
+
+        if not host:
+            return jsonify({"status": "error", "message": "Địa chỉ IP không được bỏ trống."}), 400
+        try:
+            port_int = int(port)
+        except (TypeError, ValueError):
+            return jsonify({"status": "error", "message": "Port phải là số."}), 400
+
+        try:
+            test_connection(
+                host=host,
+                port=port_int,
+                password=int(password) if password not in (None, "") else 0,
+                timeout=int(timeout) if timeout not in (None, "") else 5,
+                force_udp=_parse_bool(force_udp),
+            )
+        except SyncError as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 400
+
+        force_udp_flag = _parse_bool(force_udp)
+        session["device_config"] = {
+            "host": host,
+            "port": port_int,
+            "password": int(password) if password not in (None, "") else 0,
+            "timeout": int(timeout) if timeout not in (None, "") else 5,
+            "force_udp": force_udp_flag,
+        }
+        session.modified = True
+
+        return jsonify({"status": "ok", "config": session["device_config"]})
+
+    @app.post("/api/device/disconnect")
+    def api_disconnect_device():
+        session.pop("device_config", None)
+        return jsonify({"status": "ok"})
 
     return app
 

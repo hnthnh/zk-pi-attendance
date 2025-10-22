@@ -23,6 +23,9 @@
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
             <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'connect_device' %}active{% endif %}" href="{{ url_for('connect_device') }}">Kết nối</a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">Dashboard</a>
             </li>
             <li class="nav-item">
